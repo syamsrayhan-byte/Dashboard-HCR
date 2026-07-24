@@ -411,7 +411,14 @@ td .mono{font-size:.82rem}
 
 <div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
+/* =============== SUPABASE =============== */
+const SUPABASE_URL = 'https://xapvrcotgffdcadambri.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhhcHZyY290Z2ZmZGNhZGFtYnJpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4NjYzOTcsImV4cCI6MjEwMDQ0MjM5N30.0Lpkg6ssP1RFGnBNLjIYZp2A0AdkKT4tzfxC94iz_RA';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const STATE_ROW_ID = 'hcr';
+
 /* =============== KONFIG =============== */
 const DIVS = {
   DC:  {key:'DC',  name:'Digital Creative', hue:'#fea303', desc:'Digital product & konten sosial media'},
@@ -438,11 +445,11 @@ const dayShift = n => { const d=new Date(); d.setDate(d.getDate()+n); return d.t
 const SEED = {
   theme:'dark',
   users: [
-    {id:'u1', u:'rayhan',  p:'123',   name:'Rayhan',  div:'DC',  photo:AVATARS.rayhan},
-    {id:'u2', u:'opie',    p:'123',   name:'Opie',    div:'PID', photo:AVATARS.opie},
-    {id:'u3', u:'cahyo',   p:'123',   name:'Cahyo',   div:'BM',  photo:AVATARS.cahyo},
-    {id:'u4', u:'hidayat', p:'123',   name:'Hidayat', div:'FIN', photo:AVATARS.hidayat},
-    {id:'u0', u:'admin',   p:'admin', name:'Admin',   div:'ADM'}
+    {id:'u1', u:'rayhan',  name:'Rayhan',  div:'DC',  photo:AVATARS.rayhan},
+    {id:'u2', u:'opie',    name:'Opie',    div:'PID', photo:AVATARS.opie},
+    {id:'u3', u:'cahyo',   name:'Cahyo',   div:'BM',  photo:AVATARS.cahyo},
+    {id:'u4', u:'hidayat', name:'Hidayat', div:'FIN', photo:AVATARS.hidayat},
+    {id:'u0', u:'admin',   name:'Admin',   div:'ADM'}
   ],
   columns: [
     {id:'col1', name:'Brief'},
@@ -527,16 +534,21 @@ let selDay = today();
 
 async function loadState(){
   try{
-    if(window.storage){
-      const r = await window.storage.get('hcr-state-v9');
-      if(r && r.value){ S = JSON.parse(r.value); return; }
-    }
-  }catch(e){}
+    const { data, error } = await sb.from('app_state').select('data').eq('id', STATE_ROW_ID).maybeSingle();
+    if(error) throw error;
+    if(data && data.data){ S = data.data; return; }
+  }catch(e){ console.error('loadState failed, falling back to seed data:', e); }
   S = JSON.parse(JSON.stringify(SEED));
   saveState();
 }
+let savingState = false;
 async function saveState(){
-  try{ if(window.storage) await window.storage.set('hcr-state-v9', JSON.stringify(S)); }catch(e){}
+  savingState = true;
+  try{
+    const { error } = await sb.from('app_state').upsert({ id: STATE_ROW_ID, data: S, updated_at: new Date().toISOString() });
+    if(error) console.error('saveState failed:', error);
+  }catch(e){ console.error('saveState failed:', e); }
+  finally{ savingState = false; }
 }
 const uid = p => p + Math.random().toString(36).slice(2,9);
 
@@ -595,22 +607,48 @@ function moneyPill(status){
 /* =============== LOGIN =============== */
 function renderDemoBtns(){
   $('#demoBtns').innerHTML = SEED.users.map(u=>
-    `<button type="button" data-u="${u.u}" data-p="${u.p}">${u.u} · ${u.div==='ADM'?'admin':u.div.toLowerCase()}</button>`).join('');
+    `<button type="button" data-u="${u.u}" data-p="${u.u}123">${u.u} · ${u.div==='ADM'?'admin':u.div.toLowerCase()}</button>`).join('');
   $('#demoBtns').querySelectorAll('button').forEach(b=>b.onclick=()=>{
     $('#u').value=b.dataset.u; $('#p').value=b.dataset.p; $('#loginErr').textContent='';
   });
 }
-$('#loginForm').addEventListener('submit', e=>{
-  e.preventDefault();
-  const u=$('#u').value.trim().toLowerCase(), p=$('#p').value;
-  const found = S.users.find(x=>x.u===u && x.p===p);
-  if(!found){ $('#loginErr').textContent='Username atau password salah. Coba lagi.'; return; }
+let realtimeChannel = null;
+function subscribeRealtime(){
+  if(realtimeChannel) return;
+  realtimeChannel = sb.channel('app_state_sync')
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'app_state', filter:`id=eq.${STATE_ROW_ID}` }, payload => {
+      if(savingState || !payload.new || !payload.new.data) return;
+      S = payload.new.data;
+      applyTheme();
+      if(me){ renderShell(); render(); }
+    })
+    .subscribe();
+}
+async function afterAuth(session){
+  const username = session.user.email.split('@')[0];
+  await loadState();
+  const found = S.users.find(x=>x.u===username);
+  if(!found){
+    await sb.auth.signOut();
+    $('#loginErr').textContent='Akun tidak terdaftar di sistem.';
+    return;
+  }
   me=found; view='home'; projFilter='ALL';
   $('#login').classList.remove('on'); $('#app').classList.add('on');
-  renderShell(); render();
+  applyTheme(); renderShell(); render();
+  subscribeRealtime();
+}
+$('#loginForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const u=$('#u').value.trim().toLowerCase(), p=$('#p').value;
+  $('#loginErr').textContent='';
+  const { data, error } = await sb.auth.signInWithPassword({ email:`${u}@hcr.id`, password:p });
+  if(error){ $('#loginErr').textContent='Username atau password salah. Coba lagi.'; return; }
+  await afterAuth(data.session);
 });
 function logout(){
-  me=null; closeModal();
+  sb.auth.signOut();
+  me=null; S=null; closeModal();
   $('#app').classList.remove('on'); $('#login').classList.add('on');
   $('#u').value=''; $('#p').value=''; $('#loginErr').textContent='';
 }
@@ -1652,7 +1690,11 @@ function bind(root){
 }
 
 /* =============== BOOT =============== */
-loadState().then(()=>{ applyTheme(); renderDemoBtns(); });
+(async ()=>{
+  applyTheme(); renderDemoBtns();
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session) await afterAuth(session);
+})();
 </script>
 </body>
 </html>
