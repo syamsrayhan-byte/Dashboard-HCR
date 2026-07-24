@@ -117,13 +117,6 @@ body{background:var(--bg);color:var(--ink);font-family:'Manrope',sans-serif;min-
 .btn.danger{background:rgba(255,125,157,.1);color:var(--red);border-color:rgba(255,125,157,.35);box-shadow:none}
 .btn:focus-visible,.chip:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
 .login-err{color:var(--red);font-size:.8rem;min-height:1.2em;margin:2px 0 10px}
-.demo{margin-top:24px;border-top:1px dashed var(--line);padding-top:16px}
-.demo p{font-size:.64rem;letter-spacing:.24em;text-transform:uppercase;color:var(--faint);font-family:'IBM Plex Mono',monospace;margin-bottom:10px}
-.demo-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.demo button{
-  text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
-  padding:8px 10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:.68rem;cursor:pointer;transition:.2s}
-.demo button:hover{color:var(--ink);border-color:rgba(254,163,3,.45)}
 
 /* ---------- APP SHELL ---------- */
 #app{position:relative;z-index:2;display:none;min-height:100vh}
@@ -396,10 +389,6 @@ td .mono{font-size:.82rem}
         <div class="login-err" id="loginErr"></div>
         <button class="btn full" type="submit">Masuk Dashboard →</button>
       </form>
-      <div class="demo">
-        <p>Akun demo · klik untuk isi otomatis</p>
-        <div class="demo-grid" id="demoBtns"></div>
-      </div>
     </div>
   </div>
 </section>
@@ -614,13 +603,6 @@ function moneyPill(status){
 }
 
 /* =============== LOGIN =============== */
-function renderDemoBtns(){
-  $('#demoBtns').innerHTML = SEED.users.map(u=>
-    `<button type="button" data-u="${u.u}" data-p="${u.u}123">${u.u} · ${u.div==='ADM'?'admin':u.div.toLowerCase()}</button>`).join('');
-  $('#demoBtns').querySelectorAll('button').forEach(b=>b.onclick=()=>{
-    $('#u').value=b.dataset.u; $('#p').value=b.dataset.p; $('#loginErr').textContent='';
-  });
-}
 let realtimeChannel = null;
 function subscribeRealtime(){
   if(realtimeChannel) return;
@@ -1700,7 +1682,7 @@ function bind(root){
 
 /* =============== BOOT =============== */
 (async ()=>{
-  applyTheme(); renderDemoBtns();
+  applyTheme();
   const { data:{ session } } = await sb.auth.getSession();
   if(session) await afterAuth(session);
 })();
