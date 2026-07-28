@@ -111,10 +111,14 @@ body{background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;min-he
   transition:transform .15s,box-shadow .2s;
 }
 .btn.full{width:100%}
-.btn:hover{transform:translateY(-1px);box-shadow:0 8px 26px rgba(254,163,3,.4)}
+.btn:not(:disabled):hover{transform:translateY(-1px);box-shadow:0 8px 26px rgba(254,163,3,.4)}
 .btn.ghost{background:var(--panel2);color:var(--muted);border-color:var(--line);box-shadow:none;font-family:'Inter',sans-serif;font-weight:600}
 .btn.ghost:hover{color:var(--ink);border-color:var(--line-strong)}
 .btn.danger{background:rgba(255,125,157,.1);color:var(--red);border-color:rgba(255,125,157,.35);box-shadow:none}
+.btn:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none}
+.btn.danger.armed{background:var(--red);color:#fff;border-color:var(--red)}
+.log-del.armed,.kcol-x.armed{color:#fff;background:var(--red);border-radius:6px;opacity:1}
+body.scroll-lock{overflow:hidden}
 .btn:focus-visible,.chip:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.nav-btn:focus-visible,.modal-x:focus-visible,.menu-sheet-x:focus-visible,.todo-check:focus-visible,.dp-grid button:focus-visible,.menu-sheet-item:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
 .login-err{color:var(--red);font-size:.8rem;min-height:1.2em;margin:2px 0 10px}
 
@@ -382,12 +386,12 @@ td .mono{font-size:.82rem}
   .cal-legend{display:none}
   .cal-card{padding:16px 0;margin-left:-14px;margin-right:-14px;width:calc(100% + 28px);border-left:none;border-right:none;border-radius:0;background:transparent;box-shadow:none;border-top:none;border-bottom:none}
   .cal-grid{border-left:none;border-right:none;border-radius:0}
-  .cal-dow{padding:7px 2px;font-size:.56rem}
-  .cal-cell{height:78px;padding:4px 3px;overflow:hidden}
+  .cal-dow{padding:7px 2px;font-size:.62rem}
+  .cal-cell{height:88px;padding:4px 3px;overflow:hidden}
   .cal-cell .dnum{width:19px;height:19px;font-size:.6rem;margin-bottom:2px}
-  .cal-ev{font-size:.5rem;padding:1.5px 3px;border-radius:4px;line-height:1.35;margin-bottom:2px;border-left-width:2px}
+  .cal-ev{font-size:.62rem;padding:1.5px 3px;border-radius:4px;line-height:1.35;margin-bottom:2px;border-left-width:2px}
   .cal-ev-t{display:none}
-  .cal-more{font-size:.5rem}
+  .cal-more{font-size:.6rem}
   .day-panel{padding:14px 14px 0}
   .kcol{width:min(272px,80vw)}
   .log-input-row{flex-wrap:wrap}
@@ -499,11 +503,17 @@ td .mono{font-size:.82rem}
 .surat-tool .fee-input-wrap input{padding-left:42px !important;font-weight:600}
 .surat-tool .payment-info{margin-top:22px;border:1.5px solid var(--line);border-radius:10px;padding:16px 16px 12px;background:#FAFBFD}
 .surat-tool .payment-info .task-title{color:var(--green)}
-.surat-tool .toast{
+.toast{
   position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#1C2733;color:#fff;
   padding:11px 18px;border-radius:9px;font-size:13px;opacity:0;pointer-events:none;transition:all .2s ease;z-index:999;
 }
-.surat-tool .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* di mobile, angkat toast di atas bottom nav supaya tidak menutupinya.
+   harus setelah rule .toast di atas: media query tidak menambah spesifisitas,
+   jadi yang menang adalah yang terakhir di source order */
+@media(max-width:860px){
+  .toast{bottom:calc(92px + env(safe-area-inset-bottom));max-width:calc(100vw - 32px)}
+}
 
 #surat-pdf-doc{display:none;width:760px;margin:0 auto;background:#fff;color:#1C2733;font-family:'Inter',sans-serif}
 .doc-topbar{background:linear-gradient(90deg,#123A66,#1B6FC9);height:14px}
@@ -590,8 +600,8 @@ td .mono{font-size:.82rem}
       <div class="side-user" id="sideUser"></div>
     </div>
   </aside>
-  <div class="menu-sheet-overlay" id="menuSheet">
-    <div class="menu-sheet">
+  <div class="menu-sheet-overlay" id="menuSheet" role="dialog" aria-modal="true" aria-label="Menu Lainnya">
+    <div class="menu-sheet" tabindex="-1">
       <div class="menu-sheet-handle"></div>
       <div class="menu-sheet-head">
         <div><p class="eyebrow">SEMUA FITUR</p><h3>Menu Lainnya</h3></div>
@@ -603,7 +613,8 @@ td .mono{font-size:.82rem}
   <main id="main"></main>
 </div>
 
-<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+<div class="overlay" id="overlay" role="dialog" aria-modal="true"><div class="modal" id="modal" tabindex="-1"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
@@ -741,7 +752,8 @@ async function saveState(){
   try{
     const { error } = await sb.from('app_state').upsert({ id: STATE_ROW_ID, data: S, updated_at: new Date().toISOString() });
     if(error) console.error('saveState failed:', error);
-  }catch(e){ console.error('saveState failed:', e); }
+    return error || null;
+  }catch(e){ console.error('saveState failed:', e); return e; }
   finally{ savingState = false; }
 }
 const uid = p => p + Math.random().toString(36).slice(2,9);
@@ -866,8 +878,10 @@ const MENUS = [
 ];
 const NAV_PRIMARY = ['home','proj','cal','log'];
 let navExpanded = false;
-function openMenuSheet(){ navExpanded = true; $('#menuSheet').classList.add('on'); renderShell(); }
-function closeMenuSheet(){ navExpanded = false; $('#menuSheet').classList.remove('on'); renderShell(); }
+function openMenuSheet(){ navExpanded = true; $('#menuSheet').classList.add('on'); trapPush($('#menuSheet'), $('#menuSheet .menu-sheet')); renderShell(); }
+/* trapPop setelah renderShell(): renderShell menulis ulang DOM nav,
+   kalau fokus dikembalikan duluan elemennya keburu dihancurkan */
+function closeMenuSheet(){ if(!navExpanded) return; navExpanded = false; $('#menuSheet').classList.remove('on'); renderShell(); trapPop($('#menuSheet')); }
 function renderShell(){
   const visibleMenus = MENUS.filter(m=>!m.roles || m.roles.includes(me.div));
   const primary = visibleMenus.filter(m=>NAV_PRIMARY.includes(m.id));
@@ -1434,11 +1448,79 @@ function vLog(){
   </div>`;
 }
 
+/* =============== OVERLAY HELPERS =============== */
+const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+let trapStack=[], trapReturn=[];
+function trapPush(el, panel){
+  trapReturn.push(document.activeElement); trapStack.push(el);
+  const sw=window.innerWidth-document.documentElement.clientWidth;
+  if(sw>0) document.body.style.paddingRight=sw+'px';
+  document.body.classList.add('scroll-lock');
+  /* fokus ke kontainer, bukan input pertama: di HP auto-focus input
+     langsung memunculkan keyboard dan menutupi sheet-nya */
+  setTimeout(()=>{ (panel||el).focus(); },0);
+}
+function trapPop(el){
+  const i=trapStack.indexOf(el); if(i<0) return;
+  trapStack.splice(i,1); const prev=trapReturn.splice(i,1)[0];
+  if(!trapStack.length){ document.body.classList.remove('scroll-lock'); document.body.style.paddingRight=''; }
+  if(prev && document.contains(prev) && prev.focus) prev.focus();
+}
+let toastT=null;
+function showToast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2400);
+}
+function suratShowToast(msg){ showToast(msg); }
+/* tombol hapus dua langkah: klik pertama "menodong", klik kedua eksekusi */
+function confirmBtn(b,label){
+  if(b.dataset.armed==='1') return true;
+  b.dataset.armed='1'; b.classList.add('armed');
+  const old=b.textContent; if(label) b.textContent=label;
+  showToast('Klik sekali lagi untuk menghapus');
+  clearTimeout(b._armT);
+  b._armT=setTimeout(()=>{ b.dataset.armed=''; b.classList.remove('armed'); if(label) b.textContent=old; },3500);
+  return false;
+}
+async function withSaving(b,label){
+  const old=b.textContent; b.disabled=true; b.textContent=label||'Menyimpan…';
+  const err=await saveState();
+  if(err){ b.disabled=false; b.textContent=old; showToast('Gagal menyimpan, coba lagi'); return false; }
+  closeModal(); render(); return true;
+}
+
 /* =============== MODALS =============== */
-function openModal(html){ $('#modal').innerHTML='<div class="modal-handle"></div>'+html; $('#overlay').classList.add('on'); }
-function closeModal(){ $('#overlay').classList.remove('on'); $('#modal').innerHTML=''; }
+let modalCloseT=null;
+function openModal(html){
+  clearTimeout(modalCloseT); modalCloseT=null;
+  $('#modal').innerHTML='<div class="modal-handle"></div>'+html;
+  if(!$('#overlay').classList.contains('on')){ $('#overlay').classList.add('on'); trapPush($('#overlay'), $('#modal')); }
+}
+function closeModal(){
+  if(!$('#overlay').classList.contains('on')) return;
+  $('#overlay').classList.remove('on'); trapPop($('#overlay'));
+  /* kosongkan isi setelah animasi slide-down selesai, bukan seketika.
+     pakai timeout bukan transitionend: di desktop transform tidak berubah
+     (rule-nya cuma ada di media query mobile) jadi transitionend tak pernah fire */
+  clearTimeout(modalCloseT);
+  modalCloseT=setTimeout(()=>{ modalCloseT=null; if(!$('#overlay').classList.contains('on')) $('#modal').innerHTML=''; },300);
+}
 $('#overlay').addEventListener('click', e=>{ if(e.target.id==='overlay') closeModal(); });
-document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){
+    if($('#overlay').classList.contains('on')) closeModal();
+    else if($('#menuSheet').classList.contains('on')) closeMenuSheet();
+    return;
+  }
+  if(e.key==='Tab' && trapStack.length){
+    const el=trapStack[trapStack.length-1];
+    const f=[...el.querySelectorAll(FOCUSABLE)].filter(n=>n.offsetParent!==null);
+    if(!f.length){ e.preventDefault(); return; }
+    const first=f[0], last=f[f.length-1], a=document.activeElement;
+    if(e.shiftKey && (a===first||!el.contains(a))){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey && (a===last||!el.contains(a))){ e.preventDefault(); first.focus(); }
+  }
+});
 
 function openCardModal(id){
   const p=S.projects.find(x=>x.id===id); if(!p) return;
@@ -1645,24 +1727,26 @@ function bindModal(){
     const d=D(b.dataset.team);
     b.style.cssText = on?`color:${d.hue};border-color:${d.hue}77;background:${d.hue}14`:'';
   });
-  M.querySelectorAll('[data-savecard]').forEach(b=>b.onclick=()=>{
+  M.querySelectorAll('[data-savecard]').forEach(b=>b.onclick=async()=>{
     const p=S.projects.find(x=>x.id===b.dataset.savecard); if(!p) return;
     const t=M.querySelector('#m-title').value.trim();
-    if(t) p.title=t;
+    if(!t){ M.querySelector('#m-title').focus(); showToast('Judul tugas tidak boleh kosong'); return; }
+    p.title=t;
     p.desc=M.querySelector('#m-desc').value;
     p.due=M.querySelector('#m-due').dataset.iso||'';
     p.jenis=M.querySelector('#m-jenis').value;
     p.col=M.querySelector('#m-col').value;
     p.teams=[...M.querySelectorAll('.team-chip')].filter(c=>c.dataset.on==='1').map(c=>c.dataset.team);
-    saveState(); closeModal(); render();
+    await withSaving(b, 'Menyimpan…');
   });
   M.querySelectorAll('[data-delcard]').forEach(b=>b.onclick=()=>{
+    if(!confirmBtn(b,'Klik lagi untuk hapus')) return;
     S.projects=S.projects.filter(x=>x.id!==b.dataset.delcard);
     saveState(); closeModal(); render();
   });
-  M.querySelectorAll('[data-saveclient]').forEach(b=>b.onclick=()=>{
+  M.querySelectorAll('[data-saveclient]').forEach(b=>b.onclick=async()=>{
     const name=M.querySelector('#m-cname').value.trim();
-    if(!name){ M.querySelector('#m-cname').focus(); return; }
+    if(!name){ M.querySelector('#m-cname').focus(); showToast('Nama klien wajib diisi'); return; }
     const data={
       name,
       contact:M.querySelector('#m-ccontact').value.trim(),
@@ -1679,40 +1763,42 @@ function bindModal(){
     if(b.dataset.saveclient){ c=S.clients.find(x=>x.id===b.dataset.saveclient); Object.assign(c,data); }
     else { c={id:uid('c'),...data}; S.clients.push(c); }
     if(c.status==='Deal') ensureIncomeForDeal(c);
-    saveState(); closeModal(); render();
+    await withSaving(b);
   });
   M.querySelectorAll('[data-delclient]').forEach(b=>b.onclick=()=>{
+    if(!confirmBtn(b,'Klik lagi untuk hapus')) return;
     S.clients=S.clients.filter(x=>x.id!==b.dataset.delclient);
     saveState(); closeModal(); render();
   });
-  M.querySelectorAll('[data-savefee]').forEach(b=>b.onclick=()=>{
+  M.querySelectorAll('[data-savefee]').forEach(b=>b.onclick=async()=>{
     const proj=M.querySelector('#m-fproject').value.trim();
     const amt=parseInt(M.querySelector('#m-famount').value||'0',10);
     const dt=M.querySelector('#m-fdate').value||today();
-    if(!proj||!amt){ M.querySelector('#m-fproject').focus(); return; }
+    if(!proj||!(amt>0)){ M.querySelector('#m-fproject').focus(); showToast('Isi nama proyek dan nominal fee dulu'); return; }
     S.fees.push({id:uid('f'), userId:me.id, project:proj, amount:amt, status:'unpaid', date:dt});
-    saveState(); closeModal(); render();
+    await withSaving(b);
   });
-  M.querySelectorAll('[data-saveincome]').forEach(b=>b.onclick=()=>{
+  M.querySelectorAll('[data-saveincome]').forEach(b=>b.onclick=async()=>{
     const name=M.querySelector('#m-iname').value.trim();
     const amt=parseInt(M.querySelector('#m-iamount').value||'0',10);
     const dt=M.querySelector('#m-idate').value||today();
-    if(!name||!amt){ M.querySelector('#m-iname').focus(); return; }
+    if(!name||!(amt>0)){ M.querySelector('#m-iname').focus(); showToast('Isi nama pemasukan dan nominalnya dulu'); return; }
     S.incomes.push({id:uid('in'), clientId:null, name, amount:amt, status:'pending', by:me.id, date:dt});
-    saveState(); closeModal(); render();
+    await withSaving(b);
   });
-  M.querySelectorAll('[data-saveevent]').forEach(b=>b.onclick=()=>{
+  M.querySelectorAll('[data-saveevent]').forEach(b=>b.onclick=async()=>{
     const title=M.querySelector('#m-etitle').value.trim();
     const date=M.querySelector('#m-edate').value;
-    if(!title||!date){ M.querySelector('#m-etitle').focus(); return; }
+    if(!title||!date){ M.querySelector('#m-etitle').focus(); showToast('Isi judul dan tanggal agenda dulu'); return; }
     const data={title, date, time:M.querySelector('#m-etime').value, desc:M.querySelector('#m-edesc').value, type:M.querySelector('#m-etype').value, div:M.querySelector('#m-ediv').value};
     if(b.dataset.saveevent){
       const ev=S.events.find(e=>e.id===b.dataset.saveevent);
       if(ev) Object.assign(ev,data);
     } else S.events.push({id:uid('e'),...data});
-    saveState(); closeModal(); render();
+    await withSaving(b);
   });
   M.querySelectorAll('[data-delevent]').forEach(b=>b.onclick=()=>{
+    if(!confirmBtn(b,'Klik lagi untuk hapus')) return;
     S.events=S.events.filter(e=>e.id!==b.dataset.delevent);
     saveState(); closeModal(); render();
   });
@@ -1771,6 +1857,7 @@ function bind(root){
     root.querySelectorAll('[data-addlog]').forEach(b=>b.onclick=()=>addLogFromInput(lq));
   }
   root.querySelectorAll('[data-dellog]').forEach(b=>b.onclick=()=>{
+    if(!confirmBtn(b)) return;
     S.logs=S.logs.filter(l=>!(l.id===b.dataset.dellog && (l.userId===me.id||me.div==='ADM')));
     saveState(); render();
   });
@@ -1857,6 +1944,7 @@ function bind(root){
   });
   root.querySelectorAll('[data-delcol]').forEach(b=>b.onclick=()=>{
     if(S.columns.length<=1) return;
+    if(!confirmBtn(b)) return;
     const id=b.dataset.delcol;
     const target=S.columns.find(c=>c.id!==id);
     S.projects.forEach(p=>{ if(p.col===id) p.col=target.id; });
@@ -2012,7 +2100,6 @@ function vSuratConfirmationTool(){
       </div>
     </div>
 
-    <div class="toast" id="surat-toast"></div>
 
     <div id="surat-pdf-doc">
       <div class="doc-topbar"></div>
@@ -2271,13 +2358,6 @@ function suratFormatRentang(isoMulai, isoSelesai){
     return a.getDate() + ' ' + bulan[a.getMonth()] + ' s.d. ' + b.getDate() + ' ' + bulan[b.getMonth()] + ' ' + b.getFullYear();
   }
   return a.getDate() + ' - ' + b.getDate() + ' ' + bulan[a.getMonth()] + ' ' + a.getFullYear();
-}
-
-function suratShowToast(msg){
-  const t = document.getElementById('surat-toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2400);
 }
 
 function suratResetForm(){
