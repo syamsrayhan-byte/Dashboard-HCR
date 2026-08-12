@@ -133,6 +133,10 @@ aside{
 .side-logo{padding:2px 8px 24px}
 .side-logo img{width:150px;filter:var(--logo-filter)}
 .nav-label{padding:12px 10px 8px;font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.3em;text-transform:uppercase;color:var(--faint)}
+/* Sidebar memuat seluruh menu; kalau layarnya pendek biar nav-nya yang scroll,
+   bukan tema & kartu user yang terdorong keluar layar. Mobile dikecualikan
+   karena tombol FAB-nya sengaja menonjol keluar batas bar. */
+@media(min-width:861px){ #nav{min-height:0;overflow-y:auto} }
 .nav-btn{
   display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border-radius:12px;cursor:pointer;
   background:transparent;border:1px solid transparent;color:var(--muted);font-family:'Inter',sans-serif;
@@ -576,7 +580,7 @@ td .mono{font-size:.82rem}
       <form id="loginForm">
         <div class="field">
           <label for="u">Username</label>
-          <input id="u" autocomplete="username" placeholder="mis. rara" required>
+          <input id="u" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="mis. rara" required>
         </div>
         <div class="field">
           <label for="p">Password</label>
@@ -825,12 +829,12 @@ function subscribeRealtime(){
     .subscribe();
 }
 async function afterAuth(session){
-  const username = session.user.email.split('@')[0];
+  const username = session.user.email.split('@')[0].toLowerCase();
   await loadState();
-  const found = S.users.find(x=>x.u===username);
+  const found = S.users.find(x=>String(x.u).toLowerCase()===username);
   if(!found){
     await sb.auth.signOut();
-    $('#loginErr').textContent='Akun tidak terdaftar di sistem.';
+    $('#loginErr').textContent=`Login berhasil, tapi username "${username}" belum terdaftar di data tim. Minta admin menambahkannya.`;
     return;
   }
   me=found; view='home'; projFilter='ALL';
@@ -838,12 +842,40 @@ async function afterAuth(session){
   applyTheme(); renderShell(); render();
   subscribeRealtime();
 }
+/* Terjemahkan error Supabase jadi pesan yang menunjukkan penyebab sebenarnya,
+   supaya "salah password" tidak tertukar dengan akun belum dikonfirmasi,
+   koneksi putus, atau konfigurasi server yang bermasalah. */
+function authErrorText(error){
+  const code   = String((error && error.code) || '');
+  const msg    = String((error && error.message) || '').toLowerCase();
+  const status = error && error.status;
+
+  if(code==='invalid_credentials' || msg.includes('invalid login credentials'))
+    return 'Username atau password salah. Coba lagi.';
+  if(code==='email_not_confirmed' || msg.includes('email not confirmed'))
+    return 'Akun ini belum dikonfirmasi. Minta admin mengaktifkannya lewat Supabase → Authentication → Users.';
+  if(code==='user_banned' || msg.includes('banned'))
+    return 'Akun ini sedang diblokir. Hubungi admin.';
+  if(code==='over_request_rate_limit' || status===429)
+    return 'Terlalu banyak percobaan login. Tunggu beberapa menit, lalu coba lagi.';
+  if(msg.includes('failed to fetch') || msg.includes('load failed') || msg.includes('networkerror'))
+    return 'Tidak bisa terhubung ke server. Cek koneksi internet kamu.';
+  if(msg.includes('api key') || msg.includes('apikey') || msg.includes('project not found'))
+    return 'Konfigurasi server bermasalah (API key ditolak). Hubungi admin.';
+  return 'Gagal masuk: ' + ((error && error.message) || 'kesalahan tidak diketahui') + '.';
+}
+
 $('#loginForm').addEventListener('submit', async e=>{
   e.preventDefault();
   const u=$('#u').value.trim().toLowerCase(), p=$('#p').value;
   $('#loginErr').textContent='';
+  if(!u){ $('#loginErr').textContent='Isi username dulu.'; $('#u').focus(); return; }
   const { data, error } = await sb.auth.signInWithPassword({ email:`${u}@hcr.id`, password:p });
-  if(error){ $('#loginErr').textContent='Username atau password salah. Coba lagi.'; return; }
+  if(error){
+    console.error('Login gagal:', error);
+    $('#loginErr').textContent = authErrorText(error);
+    return;
+  }
   await afterAuth(data.session);
 });
 function logout(){
@@ -878,6 +910,13 @@ const MENUS = [
 ];
 const NAV_PRIMARY = ['home','proj','cal','log'];
 let navExpanded = false;
+/* Breakpoint yang sama dengan CSS: di atas 860px aside jadi sidebar,
+   di bawahnya jadi bottom bar. */
+const navMobileMQ = window.matchMedia('(max-width:860px)');
+navMobileMQ.addEventListener('change', ()=>{
+  if(!me) return;
+  if(navExpanded) closeMenuSheet(); else renderShell();
+});
 function openMenuSheet(){ navExpanded = true; $('#menuSheet').classList.add('on'); trapPush($('#menuSheet'), $('#menuSheet .menu-sheet')); renderShell(); }
 /* trapPop setelah renderShell(): renderShell menulis ulang DOM nav,
    kalau fokus dikembalikan duluan elemennya keburu dihancurkan */
@@ -894,8 +933,12 @@ function renderShell(){
       : '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>'}</svg>
   </button>`;
 
+  /* Sidebar desktop muat semua menu, jadi tombol "Menu Lainnya" tidak dipakai.
+     Bottom bar mobile cuma muat 4 item, sisanya lewat menu sheet. */
   let navHtml;
-  if(extra.length){
+  if(!navMobileMQ.matches){
+    navHtml = visibleMenus.map(navBtn).join('');
+  } else if(extra.length){
     const mid = Math.ceil(primary.length/2);
     navHtml = primary.slice(0,mid).map(navBtn).join('') + toggleBtn + primary.slice(mid).map(navBtn).join('');
   } else {
