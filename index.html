@@ -404,13 +404,37 @@ td .mono{font-size:.82rem}
 .chat-who i{width:6px;height:6px;border-radius:50%;background:var(--green);flex:none}
 .chat-who.off i{background:var(--faint)}
 .chat-x{
-  margin-left:auto;flex:none;width:32px;height:32px;border-radius:50%;cursor:pointer;
+  flex:none;width:32px;height:32px;border-radius:50%;cursor:pointer;
   border:1px solid var(--line);background:var(--panel);color:var(--muted);display:grid;place-items:center;
 }
 .chat-x:hover{color:var(--ink);border-color:var(--line-strong)}
 .chat-x svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
 
 /* latar bertitik halus, biar terasa seperti ruang obrolan */
+.chat-acts{margin-left:auto;display:flex;align-items:center;gap:7px}
+.chat-bell{
+  flex:none;width:32px;height:32px;border-radius:50%;cursor:pointer;
+  border:1px solid var(--line);background:var(--panel);color:var(--muted);display:grid;place-items:center;
+}
+.chat-bell:hover{color:var(--ink);border-color:var(--line-strong)}
+.chat-bell.on{color:var(--orange);border-color:rgba(254,163,3,.45);background:rgba(254,163,3,.12)}
+.chat-bell svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.chat-bell .slash{display:none}
+.chat-bell.muted .slash{display:block}
+.chat-perm{
+  flex:none;display:flex;align-items:center;gap:10px;padding:9px 13px;
+  border-bottom:1px solid var(--line);background:rgba(254,163,3,.1);
+  font-size:.74rem;color:var(--ink);
+}
+.chat-perm[hidden]{display:none}
+.chat-perm span{flex:1;min-width:0}
+.chat-perm button{
+  flex:none;padding:6px 12px;border-radius:999px;cursor:pointer;
+  border:1px solid rgba(254,163,3,.5);background:rgba(254,163,3,.18);color:var(--orange);
+  font-family:'Inter',sans-serif;font-size:.72rem;font-weight:600;
+}
+.chat-perm button:hover{background:rgba(254,163,3,.28)}
+
 .chat-scroll{
   flex:1;min-height:0;overflow-y:auto;padding:12px 12px 16px;display:flex;flex-direction:column;
   background-image:radial-gradient(var(--line) 1px, transparent 1px);
@@ -786,7 +810,16 @@ td .mono{font-size:.82rem}
       <h4>Chat Tim</h4>
       <div class="chat-who off" id="chatWho"><i></i>Menyambung…</div>
     </div>
-    <button class="chat-x" id="chatClose" type="button" aria-label="Tutup chat"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="chat-acts">
+      <button class="chat-bell" id="chatBell" type="button" aria-label="Notifikasi">
+        <svg viewBox="0 0 24 24"><path d="M18 15.5v-4a6 6 0 1 0-12 0v4l-1.5 2.5h15L18 15.5z"/><path d="M10 19.5a2 2 0 0 0 4 0"/><path class="slash" d="M4 4l16 16"/></svg>
+      </button>
+      <button class="chat-x" id="chatClose" type="button" aria-label="Tutup chat"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+  </div>
+  <div class="chat-perm" id="chatPerm" hidden>
+    <span>Nyalakan notifikasi biar tahu kalau ada chat baru.</span>
+    <button id="chatPermBtn" type="button">Aktifkan</button>
   </div>
   <div class="chat-scroll" id="chatScroll"></div>
   <button class="chat-new" id="chatNewPill" type="button">↓ Pesan baru</button>
@@ -1027,7 +1060,7 @@ async function afterAuth(session){
   subscribeRealtime();
   chatBoot();
   subscribeChat();
-  loadChat().then(()=>{ chatPaintFab(); chatPaintHead(); if(chatIsOpen()) chatRefreshList(true); });
+  loadChat().then(()=>{ chatPaintCounters(); chatPaintHead(); if(chatIsOpen()) chatRefreshList(true); });
 }
 /* Terjemahkan error Supabase jadi pesan yang menunjukkan penyebab sebenarnya,
    supaya "salah password" tidak tertukar dengan akun belum dikonfirmasi,
@@ -1768,7 +1801,8 @@ function chatOnIncoming(m){
     chatRefreshList(stick);
     if(stick) chatMarkSeen(); else { chatNewCount++; chatPaintPill(); }
   }
-  chatPaintFab();
+  chatSignal(m);
+  chatPaintCounters();
 }
 
 /* --- buka / tutup panel --- */
@@ -1796,7 +1830,7 @@ function openChat(){
   if(navMobileMQ.matches){ trapPush(p, p); chatTrapped = true; }
   chatRefreshList(true);
   chatSyncSend();
-  chatPaintFab();
+  chatPaintCounters();
   if(!navMobileMQ.matches) document.getElementById('chatInput').focus();
 }
 function closeChat(){
@@ -1807,8 +1841,123 @@ function closeChat(){
   fab.setAttribute('aria-expanded','false');
   if(chatTrapped){ trapPop(p); chatTrapped = false; }
   chatMentionClose();
-  chatPaintFab();
+  chatPaintCounters();
 }
+
+/* --- notifikasi ke perangkat --- */
+/* Bekerja untuk siapa pun yang sedang login dan tab/PWA-nya masih hidup —
+   termasuk saat tab di belakang atau aplikasi diminimalkan. Notifikasi saat
+   aplikasi benar-benar tertutup butuh Web Push (VAPID + Edge Function), belum
+   dipasang. Sinyal ditahan kalau user memang sedang menatap chatnya. */
+const CHAT_NOTIF_KEY = 'hcr-chat-notif';
+const CHAT_TITLE = document.title;
+let chatAudio = null;
+
+const chatNotifPerm = () => (typeof Notification === 'undefined') ? 'unsupported' : Notification.permission;
+function chatNotifOn(){
+  if(chatNotifPerm() !== 'granted') return false;
+  try{ return localStorage.getItem(CHAT_NOTIF_KEY) !== 'off'; }catch(e){ return true; }
+}
+function chatPaintBell(){
+  const b = document.getElementById('chatBell');
+  const perm = chatNotifPerm();
+  if(b){
+    const on = chatNotifOn();
+    b.classList.toggle('on', on);
+    b.classList.toggle('muted', !on);
+    b.title = perm==='unsupported' ? 'Browser ini tidak mendukung notifikasi'
+      : perm==='denied' ? 'Notifikasi diblokir di pengaturan situs browser'
+      : on ? 'Notifikasi aktif — klik untuk matikan'
+           : 'Notifikasi mati — klik untuk nyalakan';
+    b.setAttribute('aria-label', b.title);
+  }
+  const p = document.getElementById('chatPerm');
+  if(p) p.hidden = perm !== 'default';
+}
+async function chatAskNotif(){
+  if(chatNotifPerm() === 'unsupported'){ showToast('Browser ini tidak mendukung notifikasi.'); return; }
+  try{
+    /* Safari lawas memakai gaya callback, browser lain mengembalikan Promise */
+    const r = Notification.requestPermission();
+    const res = (r && typeof r.then === 'function') ? await r
+      : await new Promise(done => Notification.requestPermission(done));
+    chatPaintBell();
+    showToast(res==='granted' ? 'Notifikasi chat aktif.'
+      : res==='denied' ? 'Izin notifikasi ditolak. Ubah lewat pengaturan situs.'
+      : 'Izin notifikasi belum diberikan.');
+  }catch(e){ console.error('requestPermission failed:', e); }
+}
+function chatBellClick(){
+  const perm = chatNotifPerm();
+  if(perm === 'unsupported'){ showToast('Browser ini tidak mendukung notifikasi.'); return; }
+  if(perm === 'denied'){ showToast('Notifikasi diblokir. Izinkan lewat pengaturan situs di browser.'); return; }
+  if(perm === 'default'){ chatAskNotif(); return; }
+  const next = !chatNotifOn();
+  try{ localStorage.setItem(CHAT_NOTIF_KEY, next?'on':'off'); }catch(e){}
+  chatPaintBell();
+  showToast(next ? 'Notifikasi chat dinyalakan.' : 'Notifikasi chat dimatikan.');
+}
+
+/* bunyi lembut dua nada, dibangkitkan WebAudio biar tidak perlu file aset */
+function chatBeep(){
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return;
+    chatAudio = chatAudio || new AC();
+    if(chatAudio.state === 'suspended') chatAudio.resume();
+    const t = chatAudio.currentTime;
+    const g = chatAudio.createGain();
+    g.connect(chatAudio.destination);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.08, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    [880, 1320].forEach((hz, i) => {
+      const o = chatAudio.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(hz, t + i*0.09);
+      o.connect(g); o.start(t + i*0.09); o.stop(t + 0.32);
+    });
+  }catch(e){ /* autoplay diblokir sampai ada interaksi — abaikan saja */ }
+}
+
+function chatNotify(m){
+  const u = byId(m.user_id);
+  const tagged = Array.isArray(m.mentions) && me && m.mentions.includes(me.id);
+  const body = m.body.length > 140 ? m.body.slice(0,140) + '…' : m.body;
+  try{
+    const n = new Notification(tagged ? `${u.name} menyebut kamu` : `${u.name} · Chat Tim`, {
+      body, icon:'icons/icon-192.png', badge:'icons/icon-192.png',
+      tag:'hcr-chat', renotify:true
+    });
+    n.onclick = () => { try{ window.focus(); }catch(e){} openChat(); n.close(); };
+    setTimeout(()=>{ try{ n.close(); }catch(e){} }, 12000);
+  }catch(e){ console.error('notify failed:', e); }
+}
+/* Satu pesan = satu sinyal. Kalau notifikasi sistem tampil, bunyinya diserahkan
+   ke sistem; bunyi sendiri hanya dipakai saat izin belum ada tapi tab terbuka. */
+function chatSignal(m){
+  if(!me || m.user_id === me.id) return;
+  const box = document.getElementById('chatScroll');
+  const looking = !document.hidden && chatIsOpen() && box && chatAtBottom(box);
+  if(looking) return;
+  if(chatNotifOn()) chatNotify(m);
+  else if(!document.hidden) chatBeep();
+}
+
+function chatPaintTitle(){
+  const n = chatUnread();
+  document.title = n ? `(${n}) ${CHAT_TITLE}` : CHAT_TITLE;
+}
+function chatPaintAppBadge(){
+  try{
+    const n = chatUnread();
+    if(navigator.setAppBadge && navigator.clearAppBadge){
+      if(n) navigator.setAppBadge(n); else navigator.clearAppBadge();
+    }
+  }catch(e){}
+}
+/* dipakai di semua tempat yang mengubah jumlah belum dibaca */
+function chatPaintCounters(){ chatPaintFab(); chatPaintTitle(); chatPaintAppBadge(); }
 
 /* --- render daftar pesan --- */
 function chatText(body){
@@ -1863,7 +2012,7 @@ function chatRefreshList(stick){
 function chatToBottom(box){
   box = box || document.getElementById('chatScroll'); if(!box) return;
   box.scrollTop = box.scrollHeight;
-  chatNewCount = 0; chatPaintPill(); chatMarkSeen(); chatPaintFab();
+  chatNewCount = 0; chatPaintPill(); chatMarkSeen(); chatPaintCounters();
 }
 function chatPaintPill(){
   const p = document.getElementById('chatNewPill'); if(!p) return;
@@ -1997,6 +2146,15 @@ function chatWire(){
   document.getElementById('chatClose').onclick = closeChat;
   document.getElementById('chatSend').onclick = () => chatSend();
   document.getElementById('chatNewPill').onclick = () => chatToBottom();
+  document.getElementById('chatBell').onclick = chatBellClick;
+  document.getElementById('chatPermBtn').onclick = chatAskNotif;
+  /* balik ke tab sambil chat terbuka di dasar = pesannya sudah kebaca */
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden || !chatIsOpen()) { chatPaintCounters(); return; }
+    const box2 = document.getElementById('chatScroll');
+    if(box2 && chatAtBottom(box2)) chatMarkSeen();
+    chatPaintCounters();
+  });
 
   inp.addEventListener('input', ()=>{ chatGrow(inp); chatMentionScan(inp); chatSyncSend(); });
   inp.addEventListener('keydown', e=>chatKey(e, inp));
@@ -2016,7 +2174,7 @@ function chatWire(){
     const had = chatUnread();
     if(chatNewCount){ chatNewCount=0; chatPaintPill(); }
     chatMarkSeen();
-    if(had) chatPaintFab();
+    if(had) chatPaintCounters();
   });
   /* Esc menutup chat. Wajib fase capture: handler global di bawah sudah lebih
      dulu terpasang, dan kalau kita jalan belakangan, modal keburu ditutup lalu
@@ -2032,7 +2190,7 @@ function chatWire(){
 }
 function chatBoot(){
   document.getElementById('chatFab').hidden = false;
-  chatWire(); chatPaintFab(); chatPaintHead();
+  chatWire(); chatPaintCounters(); chatPaintHead(); chatPaintBell();
 }
 function chatTeardown(){
   closeChat();
@@ -2042,6 +2200,8 @@ function chatTeardown(){
   if(fab) fab.hidden = true;
   const inp = document.getElementById('chatInput');
   if(inp) inp.value='';
+  document.title = CHAT_TITLE;
+  try{ if(navigator.clearAppBadge) navigator.clearAppBadge(); }catch(e){}
 }
 /* =============== OVERLAY HELPERS =============== */
 const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
