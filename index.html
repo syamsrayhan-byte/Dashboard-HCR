@@ -465,6 +465,10 @@ td .mono{font-size:.82rem}
   border-color:rgba(254,163,3,.36);
 }
 .chat-name{font-size:.73rem;font-weight:700;margin-bottom:3px}
+.chat-bot-av{background:rgba(59,130,246,.16);border:1px solid rgba(59,130,246,.5);color:#3b82f6;display:grid;place-items:center;padding:0}
+.chat-bot-av svg{width:58%;height:58%;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round}
+.chat-row.sys .chat-bub{background:rgba(59,130,246,.10);border-color:rgba(59,130,246,.32)}
+.chat-row.sys.hit .chat-bub{border-color:rgba(254,163,3,.6)}
 .chat-text{font-size:.86rem;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
 .chat-text::after{content:"";display:table;clear:both}
 /* jam & centang mengapung di kanan, teks mengalir mengitarinya */
@@ -1745,6 +1749,10 @@ let chatWired = false;
 let chatTrapped = false;
 let chatMention = {on:false, start:-1, list:[], idx:0};
 
+const CHAT_SYS = 'sys';
+const CHAT_BOT = { id:CHAT_SYS, u:'agenda', name:'Pengingat Agenda', div:'ADM' };
+const chatWho = m => (m && m.user_id === CHAT_SYS) ? CHAT_BOT : byId(m ? m.user_id : null);
+const chatBotAvatar = size => `<span class="avatar chat-bot-av" style="width:${size}px;height:${size}px"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8.5 5V3.5M15.5 5V3.5"/></svg></span>`;
 const chatOnline = () => !!chatChannel && chatChannel.state === 'joined';
 const chatIsOpen = () => { const p = document.getElementById('chatPanel'); return !!p && p.classList.contains('on'); };
 const chatUid = () => (window.crypto && crypto.randomUUID)
@@ -1985,7 +1993,7 @@ function chatBeep(){
 }
 
 function chatNotify(m){
-  const u = byId(m.user_id);
+  const u = chatWho(m);
   const tagged = Array.isArray(m.mentions) && me && m.mentions.includes(me.id);
   const body = m.body.length > 140 ? m.body.slice(0,140) + '…' : m.body;
   try{
@@ -2046,17 +2054,18 @@ function chatListHtml(){
       lastDay = day; prev = null;
     }
     const mine = !!me && m.user_id===me.id;
-    const u = byId(m.user_id);
+    const bot = m.user_id === CHAT_SYS;
+    const u = bot ? CHAT_BOT : byId(m.user_id);
     const cont = !!prev && prev.user_id===m.user_id
       && (Date.parse(m.created_at) - Date.parse(prev.created_at)) < CHAT_GROUP_MS;
     const hit = !mine && me && Array.isArray(m.mentions) && m.mentions.includes(me.id);
     const tm = d.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
     /* centang ala WA: hanya di pesan sendiri — ⋯ terkirim, ✓ sudah masuk, ! gagal */
     const tick = mine ? (m.pending ? ' ⋯' : m.failed ? ' !' : ' ✓') : '';
-    const cls = ['chat-row', mine?'me':'', cont?'cont':'', hit?'hit':'', m.pending?'pending':''].filter(Boolean).join(' ');
+    const cls = ['chat-row', mine?'me':'', bot?'sys':'', cont?'cont':'', hit?'hit':'', m.pending?'pending':''].filter(Boolean).join(' ');
 
     out += `<div class="${cls}">
-      ${mine ? '' : `<div class="chat-av-slot">${cont ? '' : avatarHtml(u,28)}</div>`}
+      ${mine ? '' : `<div class="chat-av-slot">${cont ? '' : (bot ? chatBotAvatar(28) : avatarHtml(u,28))}</div>`}
       <div class="chat-bub">
         ${(!mine && !cont) ? `<div class="chat-name" style="color:${D(u.div).hue}">${esc(u.name)}</div>` : ''}
         <div class="chat-text">${chatText(m.body)}${m.failed?`<span class="chat-retry" data-retry="${esc(m.id)}">gagal · coba lagi</span>`:''}<span class="chat-tick">${esc(tm)}${tick}</span></div>
