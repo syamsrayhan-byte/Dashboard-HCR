@@ -869,9 +869,16 @@ const TEAM_KEYS = ['DC','PID','BM','FIN'];
 const CLIENT_STATUSES = ['Baru','Kontak Awal','Proposal','Negosiasi','Deal','Gagal'];
 const CLIENT_SOURCES = ['WA Admin','Website','Instagram','Referral','Lainnya'];
 const TODO_KINDS = ['Training','Konten','Meeting','Proposal','Digital Product'];
+/* Peran in-charge yang bisa diajukan. Nominalnya bukan urusan pengaju. */
+const FEE_ROLES = ['Fasilitator','Co-Fasilitator','Instruktur','Desainer Grafis','Videografer',
+  'Content Writer','Modul Designer','Project Officer','Admin Support','Lainnya'];
+/* Hanya Finance & Management yang boleh melihat dan mengisi nominal fee. */
+const feeMoney = () => !!me && (me.div === 'FIN' || me.div === 'ADM');
+const feeAmountText = f => f && f.amount > 0
+  ? IDR(f.amount)
+  : '<span style="color:var(--faint)">belum diisi</span>';
 const PROJECT_FORMATS = ['Offline','Online','Hybrid'];
 const today = () => new Date().toISOString().slice(0,10);
-const dayShift = n => { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
 
 /* =============== SEED =============== */
 const SEED = {
@@ -890,74 +897,21 @@ const SEED = {
     {id:'col3', name:'Review'},
     {id:'col4', name:'Done'}
   ],
-  projects: [
-    {id:'pr1', title:'Konten IG 30 Hari — BRI Regional', col:'col2', teams:['DC'],       client:'Bank BRI',         due:'2026-07-18', desc:'30 konten feed + reels untuk campaign literasi keuangan. Batch upload tiap Senin.', by:'u1', jenis:'Konten'},
-    {id:'pr2', title:'E-book Leadership Series Vol.2',   col:'col3', teams:['DC','PID'], client:'Internal HCR',     due:'2026-07-14', desc:'E-book 40 halaman dari materi training leadership. Menunggu review desain cover.', by:'u1', jenis:'Digital Product'},
-    {id:'pr3', title:'Video Company Profile Telkomsel',  col:'col1', teams:['DC','BM'],  client:'Telkomsel',        due:'2026-08-02', desc:'Video 3 menit untuk kebutuhan pitching. Brief awal dari tim BM, menunggu moodboard.', by:'u1', jenis:'Konten'},
-    {id:'pr4', title:'Proposal Training Public Speaking',col:'col2', teams:['PID','BM'], client:'Pertamina Retail', due:'2026-07-11', desc:'Proposal batch 1, 40 peserta, 2 hari. Revisi dari feedback klien: tambah sesi praktik.', by:'u2', jenis:'Proposal'},
-    {id:'pr5', title:'Kurikulum Leadership Camp 3 Hari', col:'col3', teams:['PID'],      client:'Astra Financial',  due:'2026-07-16', desc:'Kurikulum lengkap + rundown + kebutuhan fasilitator. Kickoff camp awal Agustus.', by:'u2', jenis:'Training'},
-    {id:'pr6', title:'Modul Onboarding Karyawan Baru',   col:'col4', teams:['PID','DC'], client:'Paragon Corp',     due:'2026-06-28', desc:'Modul selesai & sudah diserahkan. Potensi repeat order batch berikutnya.', by:'u2', jenis:'Digital Product'},
-    {id:'pr7', title:'Pitching Training Batch Q3',       col:'col2', teams:['BM','PID'], client:'Bank Mandiri',     due:'2026-07-20', desc:'Persiapan deck pitching + estimasi biaya. Presentasi dijadwalkan 24 Juli.', by:'u3', jenis:'Meeting'},
-    {id:'pr8', title:'Kontrak Payung Training 2026-2027',col:'col1', teams:['BM'],       client:'Kimia Farma',      due:'2026-07-30', desc:'Negosiasi kontrak payung 12 bulan. Menunggu jadwal meeting procurement.', by:'u3', jenis:'Proposal'}
-  ],
-  fees: [
-    {id:'f1', userId:'u1', project:'Konten IG 30 Hari — BRI Regional', amount:2500000, status:'unpaid', date:'2026-07-25'},
-    {id:'f2', userId:'u1', project:'Campaign HUT Kemerdekaan Paragon', amount:1750000, status:'paid',   date:'2026-06-30'},
-    {id:'f3', userId:'u1', project:'E-book Leadership Series Vol.2',   amount:1200000, status:'unpaid', date:'2026-07-20'},
-    {id:'f4', userId:'u2', project:'Proposal Training Public Speaking',amount:1500000, status:'unpaid', date:'2026-07-15'},
-    {id:'f5', userId:'u2', project:'Modul Onboarding Karyawan Baru',   amount:2000000, status:'paid',   date:'2026-07-01'},
-    {id:'f6', userId:'u2', project:'Kurikulum Leadership Camp 3 Hari', amount:2250000, status:'unpaid', date:'2026-07-22'},
-    {id:'f7', userId:'u3', project:'Komisi Deal — Bank Mandiri Q3',    amount:3500000, status:'unpaid', date:'2026-08-01'},
-    {id:'f8', userId:'u3', project:'Komisi Deal — Paragon Corp',       amount:2800000, status:'paid',   date:'2026-06-28'},
-    {id:'f9', userId:'u3', project:'Komisi Deal — Astra Financial',    amount:3100000, status:'paid',   date:'2026-07-03'}
-  ],
-  clients: [
-    {id:'c1', name:'Bank Mandiri',     contact:'Ibu Sari — HRD',        phone:'0812-1111-2201', source:'Referral',  pic:'u3', status:'Negosiasi',   value:85000000,  note:'Training batch Q3, 120 peserta', desc:'Kebutuhan: training soft skill untuk frontliner region Jabodetabek. Kontak pertama via referral alumni training 2025. Budget sudah approved internal, tinggal finalisasi vendor.'},
-    {id:'c2', name:'Kimia Farma',      contact:'Pak Budi — L&D',        phone:'0813-2222-3302', source:'Website',   pic:'u3', status:'Proposal',    value:150000000, note:'Kontrak payung 12 bulan'},
-    {id:'c3', name:'Astra Financial',  contact:'Ibu Nina — People Dev', phone:'0815-3333-4403', source:'Referral',  pic:'u3', status:'Deal',        value:95000000,  note:'Leadership camp, kickoff Agustus', desc:'Leadership camp 3 hari untuk 60 manager level menengah. Lokasi Puncak, akomodasi ditanggung klien. Pembayaran termin 2x: DP 50% dan pelunasan setelah acara.'},
-    {id:'c4', name:'Paragon Corp',     contact:'Pak Rian — HC',         phone:'0817-4444-5504', source:'Instagram', pic:'u3', status:'Deal',        value:60000000,  note:'Modul onboarding selesai, repeat order potensial'},
-    {id:'c5', name:'Pertamina Retail', contact:'Ibu Dewi — Training',   phone:'0818-5555-6605', source:'WA Admin',  pic:'u3', status:'Negosiasi',   value:45000000,  note:'Menunggu revisi proposal dari PID'},
-    {id:'c6', name:'Telkomsel',        contact:'Pak Agus — Corcomm',    phone:'0819-6666-7706', source:'WA Admin',  pic:'u3', status:'Kontak Awal', value:70000000,  note:'Intro meeting minggu depan'},
-    {id:'c7', name:'BPJS Kesehatan',   contact:'Ibu Fitri — SDM',       phone:'0811-7777-8807', source:'Website',   pic:'u3', status:'Gagal',       value:30000000,  note:'Budget dialihkan ke 2027', lostReason:'Budget training dialihkan ke tahun anggaran 2027, coba follow up lagi Q4.'},
-    {id:'c8', name:'Yamaha Motor Mfg', contact:'Pak Ahdawi',            phone:'0878-7735-9755', source:'WA Admin',  pic:'u3', status:'Baru',        value:40000000,  note:'Tanya program New Supervisor'}
-  ],
-  incomes: [
-    {id:'in1', clientId:'c4', name:'Deal — Paragon Corp (Modul Onboarding)', amount:60000000, status:'masuk',   by:'u3', date:'2026-06-25'},
-    {id:'in2', clientId:'c3', name:'Deal — Astra Financial (Leadership Camp)', amount:95000000, status:'pending', by:'u3', date:'2026-07-03'},
-    {id:'in3', clientId:null, name:'Deal — BSI (Modul Public Communication, 11 Batch)', amount:280000000, status:'masuk', by:'u3', date:'2026-01-15'},
-    {id:'in4', clientId:null, name:'Deal — Suzuki (Union Development Program 2 Batch)', amount:108000000, status:'masuk', by:'u3', date:'2026-02-10'},
-    {id:'in5', clientId:null, name:'Deal — PLN UPT Bandung (Motivational Session)', amount:10000000, status:'masuk', by:'u3', date:'2026-02-20'},
-    {id:'in6', clientId:null, name:'Deal — BPR AMK (Magic Selling)', amount:25000000, status:'masuk', by:'u3', date:'2026-05-07'},
-    {id:'in7', clientId:null, name:'Deal — BPJS Kesehatan (Disiplin & Integritas)', amount:55200000, status:'masuk', by:'u3', date:'2026-06-03'}
-  ],
+  /* Data operasional sengaja kosong. SEED hanya dipakai saat baris app_state
+     benar-benar belum ada, jadi jangan diisi contoh lagi - kalau terpakai,
+     isinya langsung jadi data produksi. */
+  projects: [],
+  fees: [],
+  clients: [],
+  incomes: [],
   targets: [
-    {m:'2026-01', t:600000000},{m:'2026-02', t:600000000},{m:'2026-03', t:500000000},
-    {m:'2026-04', t:500000000},{m:'2026-05', t:600000000},{m:'2026-06', t:700000000},
-    {m:'2026-07', t:700000000},{m:'2026-08', t:650000000},{m:'2026-09', t:700000000},
-    {m:'2026-10', t:700000000},{m:'2026-11', t:750000000},{m:'2026-12', t:500000000}
+    {m:'2026-01', t:0},{m:'2026-02', t:0},{m:'2026-03', t:0},
+    {m:'2026-04', t:0},{m:'2026-05', t:0},{m:'2026-06', t:0},
+    {m:'2026-07', t:0},{m:'2026-08', t:0},{m:'2026-09', t:0},
+    {m:'2026-10', t:0},{m:'2026-11', t:0},{m:'2026-12', t:0}
   ],
-  events: [
-    {id:'e1', date:'2026-07-10', time:'09:00', type:'Konten',   title:'Publish carousel edukasi LinkedIn', div:'DC',  desc:'Carousel 8 slide tentang tips public speaking, sudah approved.'},
-    {id:'e2', date:'2026-07-11', time:'15:00', type:'Deadline', title:'Kirim proposal Pertamina Retail',   div:'PID', desc:'Kirim via email ke Ibu Dewi sebelum jam 15.00.'},
-    {id:'e3', date:'2026-07-14', time:'10:00', type:'Meeting',  title:'Intro meeting Telkomsel',           div:'BM',  desc:'Online via Zoom, agenda: perkenalan layanan & kebutuhan konten.'},
-    {id:'e4', date:'2026-07-16', time:'08:30', type:'Training', title:'TOT internal fasilitator baru',     div:'PID', desc:'Full day di kantor, 6 fasilitator baru.'},
-    {id:'e5', date:'2026-07-18', time:'17:00', type:'Konten',   title:'Deadline konten IG BRI minggu ke-2',div:'DC',  desc:'7 feed + 2 reels, kirim ke klien untuk approval.'},
-    {id:'e6', date:'2026-07-21', time:'08:00', type:'Training', title:'Public Speaking Batch 1 — Pertamina', div:'PID', desc:'Hari 1 dari 2. Lokasi: kantor klien, 40 peserta.'},
-    {id:'e7', date:'2026-07-24', time:'13:30', type:'Meeting',  title:'Presentasi pitching Bank Mandiri',  div:'BM',  desc:'Presentasi deck training Q3 di kantor pusat.'},
-    {id:'e8', date:'2026-08-04', time:'07:00', type:'Training', title:'Leadership Camp Astra — Hari 1',    div:'PID', desc:'Camp 3 hari di Puncak, 60 peserta.'},
-    {id:'e9', date:'2026-08-06', time:'09:30', type:'Konten',   title:'Dokumentasi & recap Leadership Camp', div:'DC', desc:'Foto, video recap, dan konten testimoni peserta.'},
-    {id:'e10',date:'2026-08-12', time:'11:00', type:'Meeting',  title:'Review kontrak payung Kimia Farma', div:'BM',  desc:'Meeting dengan procurement, bawa draft kontrak final.'}
-  ],
-  logs: [
-    {id:'l1', userId:'u1', date:dayShift(0),  time:'09:15', text:'Desain 3 feed konten IG BRI minggu ke-2'},
-    {id:'l2', userId:'u1', date:dayShift(0),  time:'13:40', text:'Revisi cover e-book leadership dari feedback tim'},
-    {id:'l3', userId:'u1', date:dayShift(-1), time:'10:00', text:'Brainstorm konsep video company profile Telkomsel'},
-    {id:'l4', userId:'u2', date:dayShift(0),  time:'08:50', text:'Finalisasi rundown proposal Public Speaking Pertamina'},
-    {id:'l5', userId:'u2', date:dayShift(-1), time:'14:20', text:'Meeting internal bahas kurikulum Leadership Camp'},
-    {id:'l6', userId:'u3', date:dayShift(0),  time:'11:05', text:'Follow up Ibu Sari (Bank Mandiri) soal jadwal presentasi'},
-    {id:'l7', userId:'u3', date:dayShift(-1), time:'16:30', text:'Kirim draft kontrak payung ke Kimia Farma'},
-    {id:'l8', userId:'u4', date:dayShift(0),  time:'10:30', text:'Proses pembayaran fee Opie (Modul Onboarding)'}
-  ]
+  events: [],
+  logs: []
 };
 
 /* =============== STATE =============== */
@@ -971,12 +925,28 @@ async function loadState(){
     const { data, error } = await sb.from('app_state').select('data').eq('id', STATE_ROW_ID).maybeSingle();
     if(error) throw error;
     if(data && data.data){ S = data.data; return; }
-  }catch(e){ console.error('loadState failed, falling back to seed data:', e); }
-  S = JSON.parse(JSON.stringify(SEED));
-  saveState();
+    /* baris memang belum ada - boleh diisi data awal */
+    S = JSON.parse(JSON.stringify(SEED));
+    await saveState();
+    return;
+  }catch(e){
+    console.error('loadState gagal:', e);
+    /* JANGAN menulis SEED ke server di sini. Dulu blok ini memanggil
+       saveState() pada error apa pun, jadi satu gangguan koneksi sesaat bisa
+       menimpa seluruh data asli dengan data contoh. */
+    stateBroken = true;
+    S = JSON.parse(JSON.stringify(SEED));
+  }
 }
 let savingState = false;
+/* true kalau state gagal dimuat: penyimpanan dikunci supaya data di server
+   tidak tertimpa isi sementara yang ada di memori. */
+let stateBroken = false;
 async function saveState(){
+  if(stateBroken){
+    showToast('Data belum termuat. Muat ulang halaman dulu sebelum mengubah apa pun.');
+    return new Error('state belum termuat');
+  }
   savingState = true;
   try{
     const { error } = await sb.from('app_state').upsert({ id: STATE_ROW_ID, data: S, updated_at: new Date().toISOString() });
@@ -1132,6 +1102,7 @@ const ICONS = {
   cal:'<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8.5 5V3.5M15.5 5V3.5"/></svg>',
   log:'<svg viewBox="0 0 24 24"><path d="M6 4.5h9.5L19 8v11.5H6z"/><path d="M15 4.5V8h4M9 12h6M9 15.5h6"/></svg>',
   omset:'<svg viewBox="0 0 24 24"><path d="M4 19.5h16"/><path d="M6.5 19.5v-6M11 19.5v-10M15.5 19.5v-7.5M20 19.5V5.5"/></svg>',
+  bukti:'<svg viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M8 8h8M8 11.5h8M8 15h4"/><circle cx="16.5" cy="16" r="3.2" fill="none"/><path d="m15.2 16 .9.9 1.7-1.8"/></svg>',
   surat:'<svg viewBox="0 0 24 24"><path d="M6 3.5h8l4.5 4.5v12.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1z"/><path d="M14 3.5V8h4.5"/><path d="M8 12.5h8M8 15.5h8M8 18.5h5"/></svg>'
 };
 const MENUS = [
@@ -1142,6 +1113,7 @@ const MENUS = [
   {id:'omset',  label:'Omset & Target',s:'Omset',  icon:'omset', roles:['BM','FIN','ADM']},
   {id:'cal',    label:'Kalender',      s:'Jadwal', icon:'cal'},
   {id:'log',    label:'Log Harian',    s:'Log',    icon:'log'},
+  {id:'bukti',  label:'Bukti Transfer',s:'Bukti', icon:'bukti', roles:['FIN','ADM']},
   {id:'surat',  label:'Template Surat',s:'Surat',  icon:'surat', roles:['FIN','ADM']}
 ];
 const NAV_PRIMARY = ['home','proj','cal','log'];
@@ -1231,6 +1203,7 @@ function render(){
   if(view==='omset')  main.innerHTML = vOmset();
   if(view==='log')    main.innerHTML = vLog();
   if(view==='surat')  main.innerHTML = vSurat();
+  if(view==='bukti')  main.innerHTML = vBukti();
   bind(main);
   if(view==='surat' && suratSub==='confirmation') suratInitConfirmation();
   window.scrollTo({top:0});
@@ -1260,8 +1233,8 @@ function feeMiniList(myFees){
     <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)">
       <i style="width:8px;height:8px;border-radius:50%;flex:none;background:${f.status==='paid'?'var(--green)':'var(--orange)'}"></i>
       <div style="min-width:0;flex:1"><b style="font-size:.85rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.project)}</b>
-      <span style="font-size:.7rem;color:var(--muted)">estimasi cair ${fmtDay(f.date)}</span></div>
-      <span class="mono" style="font-size:.8rem">${IDR(f.amount)}</span>
+      <span style="font-size:.7rem;color:var(--muted)">${f.role?esc(f.role)+' · ':''}estimasi cair ${fmtDay(f.date)}</span></div>
+      ${feeMoney()?`<span class="mono" style="font-size:.8rem">${feeAmountText(f)}</span>`:''}
       ${payPill(f.status)}
     </div>`).join('');
 }
@@ -1286,9 +1259,8 @@ function vHome(){
   if(me.div==='ADM') return vHomeAdmin(firstName);
 
   const myFees = S.fees.filter(f=>f.userId===me.id);
-  const total = myFees.reduce((a,f)=>a+f.amount,0);
-  const paid = myFees.filter(f=>f.status==='paid').reduce((a,f)=>a+f.amount,0);
-  const unpaid = total-paid;
+  const paidN = myFees.filter(f=>f.status==='paid').length;
+  const unpaidN = myFees.length - paidN;
   const upcoming = [...S.events].filter(e=>e.date>=today() && (me.div==='DC' || e.type!=='Konten')).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,4);
   const isBM = me.div==='BM';
   const myIncomes = isBM ? S.incomes.filter(i=>i.by===me.id) : [];
@@ -1296,19 +1268,19 @@ function vHome(){
   return topline(`Halo, ${esc(firstName)} 👋`, `${d.name} — ${d.desc}.`) + `
   <div class="grid g3" style="margin-bottom:16px">
     <div class="card accent-top" style="--ac:var(--blue)">
-      <div class="eyebrow">Total Fee In-Charge</div>
-      <div class="stat-num">${IDR(total)}</div>
-      <div class="stat-note">${myFees.length} project fee atas nama kamu</div>
+      <div class="eyebrow">Pengajuan Fee</div>
+      <div class="stat-num">${myFees.length}</div>
+      <div class="stat-note">project in-charge atas nama kamu</div>
     </div>
     <div class="card accent-top" style="--ac:var(--green)">
       <div class="eyebrow">Sudah Dibayar</div>
-      <div class="stat-num" style="color:var(--green)">${IDR(paid)}</div>
-      <div style="margin-top:10px" class="bar"><b style="width:${total?Math.round(paid/total*100):0}%;background:var(--green)"></b></div>
+      <div class="stat-num" style="color:var(--green)">${paidN}</div>
+      <div style="margin-top:10px" class="bar"><b style="width:${myFees.length?Math.round(paidN/myFees.length*100):0}%;background:var(--green)"></b></div>
     </div>
     <div class="card accent-top" style="--ac:var(--orange)">
-      <div class="eyebrow">Menunggu Pembayaran</div>
-      <div class="stat-num" style="color:var(--orange)">${IDR(unpaid)}</div>
-      <div class="stat-note">${myFees.filter(f=>f.status==='unpaid').length} fee berstatus unpaid</div>
+      <div class="eyebrow">Diproses Finance</div>
+      <div class="stat-num" style="color:var(--orange)">${unpaidN}</div>
+      <div class="stat-note">nominal & pembayaran diatur Finance</div>
     </div>
   </div>
   ${logTodayCard(true)}
@@ -1371,9 +1343,9 @@ function vHomeFinance(firstName){
           ${avatarHtml(owner,30)}
           <div style="min-width:0;flex:1">
             <b style="font-size:.86rem;display:block">${esc(f.project)}</b>
-            <span style="font-size:.7rem;color:var(--muted)">${esc(owner.name)} · target cair ${fmtDay(f.date)}</span>
+            <span style="font-size:.7rem;color:var(--muted)">${esc(owner.name)}${f.role?' · '+esc(f.role):''} · target cair ${fmtDay(f.date)}</span>
           </div>
-          <span class="mono" style="font-size:.84rem">${IDR(f.amount)}</span>
+          <button class="toggle-pay" data-feeedit="${f.id}" title="Klik untuk isi nominal"><span class="mono" style="font-size:.84rem">${feeAmountText(f)}</span></button>
         </div>`;}).join('') : `<div class="empty">Semua fee sudah dibayar 🎉</div>`}
       <p class="hint">${paidFees.length} fee sudah selesai diproses (${IDR(paidFees.reduce((a,f)=>a+f.amount,0))}).</p>
     </div>
@@ -1431,40 +1403,48 @@ function vHomeAdmin(firstName){
 
 /* =============== FEE =============== */
 function vFee(){
-  const seeAll = me.div==='ADM' || me.div==='FIN';
-  const fees = seeAll ? S.fees : S.fees.filter(f=>f.userId===me.id);
+  const money = feeMoney();
+  const fees = money ? S.fees : S.fees.filter(f=>f.userId===me.id);
+  const paidN = fees.filter(f=>f.status==='paid').length;
   const total = fees.reduce((a,f)=>a+f.amount,0);
   const unpaidVal = fees.filter(f=>f.status==='unpaid').reduce((a,f)=>a+f.amount,0);
+  const belumIsi = fees.filter(f=>!(f.amount>0)).length;
 
-  return topline('Fee In-Charge', seeAll
-      ? 'Seluruh fee project karyawan. Klik status untuk menandai paid / unpaid.'
-      : 'Project yang kamu pegang beserta fee yang seharusnya diterima. Fee baru otomatis muncul sebagai to-do di dashboard Finance.') + `
-  <div class="grid g3" style="margin-bottom:16px">
-    <div class="card accent-top" style="--ac:var(--blue)"><div class="eyebrow">Total Nilai Fee</div><div class="stat-num">${IDR(total)}</div></div>
+  /* Staf tidak pernah melihat rupiah, jadi kartunya diganti hitungan. */
+  const cards = money ? `
+    <div class="card accent-top" style="--ac:var(--blue)"><div class="eyebrow">Total Nilai Fee</div><div class="stat-num">${IDR(total)}</div><div class="stat-note">${belumIsi} pengajuan belum diisi nominal</div></div>
     <div class="card accent-top" style="--ac:var(--green)"><div class="eyebrow">Terbayar</div><div class="stat-num" style="color:var(--green)">${IDR(total-unpaidVal)}</div></div>
-    <div class="card accent-top" style="--ac:var(--orange)"><div class="eyebrow">Outstanding</div><div class="stat-num" style="color:var(--orange)">${IDR(unpaidVal)}</div></div>
-  </div>
+    <div class="card accent-top" style="--ac:var(--orange)"><div class="eyebrow">Outstanding</div><div class="stat-num" style="color:var(--orange)">${IDR(unpaidVal)}</div></div>` : `
+    <div class="card accent-top" style="--ac:var(--blue)"><div class="eyebrow">Pengajuan</div><div class="stat-num">${fees.length}</div><div class="stat-note">project in-charge kamu</div></div>
+    <div class="card accent-top" style="--ac:var(--green)"><div class="eyebrow">Sudah Dibayar</div><div class="stat-num" style="color:var(--green)">${paidN}</div></div>
+    <div class="card accent-top" style="--ac:var(--orange)"><div class="eyebrow">Diproses Finance</div><div class="stat-num" style="color:var(--orange)">${fees.length-paidN}</div></div>`;
+
+  return topline('Fee In-Charge', money
+      ? 'Seluruh pengajuan fee tim. Klik nominal untuk mengisinya, klik status untuk menandai paid / unpaid.'
+      : 'Project yang kamu pegang beserta perannya. Nominal dan status pembayaran diatur oleh Finance.') + `
+  <div class="grid g3" style="margin-bottom:16px">${cards}</div>
   <div class="card">
     <h3>Rincian Fee <span class="eyebrow">${fees.length} entri</span>
       <button class="btn" style="padding:9px 16px;font-size:.8rem" data-open-fee-form>+ Ajukan Fee</button>
     </h3>
     <div style="overflow-x:auto"><table>
-      <thead><tr>${seeAll?'<th>Nama</th>':''}<th>Project</th><th>Estimasi Cair</th><th class="right">Nominal</th><th class="right">Status</th></tr></thead>
+      <thead><tr>${money?'<th>Nama</th>':''}<th>Project</th><th>Peran</th><th>Estimasi Cair</th>${money?'<th class="right">Nominal</th>':''}<th class="right">Status</th></tr></thead>
       <tbody>
       ${fees.map(f=>{
         const owner=byId(f.userId);
-        const canToggle = seeAll || f.userId===me.id;
         return `<tr>
-          ${seeAll?`<td><div style="display:flex;align-items:center;gap:10px">${avatarHtml(owner,28)}<span style="font-size:.82rem">${esc(owner.name)}</span></div></td>`:''}
+          ${money?`<td><div style="display:flex;align-items:center;gap:10px">${avatarHtml(owner,28)}<span style="font-size:.82rem">${esc(owner.name)}</span></div></td>`:''}
           <td><b style="font-weight:700">${esc(f.project)}</b></td>
+          <td style="color:var(--muted);font-size:.82rem">${f.role?esc(f.role):'—'}</td>
           <td class="mono" style="color:var(--muted)">${fmtDate(f.date)}</td>
-          <td class="right mono">${IDR(f.amount)}</td>
-          <td class="right">${canToggle
+          ${money?`<td class="right mono"><button class="toggle-pay" data-feeedit="${f.id}" title="Klik untuk isi nominal">${feeAmountText(f)}</button></td>`:''}
+          <td class="right">${money
             ?`<button class="toggle-pay" data-fee="${f.id}" title="Klik untuk ubah status">${payPill(f.status)}</button>`
             :payPill(f.status)}</td>
         </tr>`;}).join('')}
       </tbody>
     </table></div>
+    ${money?'':'<p class="hint">Nominal fee tidak ditampilkan di halaman ini. Finance yang mengisi nominal sekaligus menandai pembayarannya.</p>'}
   </div>`;
 }
 
@@ -1761,7 +1741,7 @@ const chatUid = () => (window.crypto && crypto.randomUUID)
       const r = Math.random()*16|0;
       return (c==='x' ? r : (r&0x3|0x8)).toString(16);
     });
-/* Pemisah tanggal chat pakai tanggal LOKAL, bukan today()/dayShift() yang
+/* Pemisah tanggal chat pakai tanggal LOKAL, bukan today() yang
    berbasis UTC. Di WIB (UTC+7) keduanya beda antara jam 00.00–07.00, dan pesan
    yang baru saja dikirim akan salah label jadi "Kemarin" kalau ikut UTC. */
 const chatDayKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -2276,6 +2256,124 @@ function chatTeardown(){
   document.title = CHAT_TITLE;
   try{ if(navigator.clearAppBadge) navigator.clearAppBadge(); }catch(e){}
 }
+/* =============== BUKTI TRANSFER =============== */
+/* Screenshot disimpan di Supabase Storage, bukan di blob app_state: satu berkas
+   bisa ratusan KB sementara app_state ditulis ulang utuh tiap saveState().
+   Bucket-nya privat karena memuat nominal, jadi dibuka lewat signed URL. */
+const BUKTI_BUCKET = 'bukti-transfer';
+
+function openFeeEditModal(id){
+  if(!feeMoney()) return;
+  const f=S.fees.find(x=>x.id===id); if(!f) return;
+  const owner=byId(f.userId);
+  openModal(`
+    <h3><span>Fee — ${esc(owner.name)}</span><button class="modal-x" data-close aria-label="Tutup" title="Tutup">✕</button></h3>
+    <div class="field"><label>Project</label><input id="m-feproject" value="${esc(f.project)}"></div>
+    <div class="f2">
+      <div class="field"><label>In-Charge Sebagai</label>
+        <input id="m-ferole" list="feeRoleList2" value="${esc(f.role||'')}" autocomplete="off" placeholder="mis. Fasilitator">
+        <datalist id="feeRoleList2">${FEE_ROLES.map(r=>`<option value="${r}"></option>`).join('')}</datalist>
+      </div>
+      <div class="field"><label>Estimasi Cair</label><input id="m-fedate" type="date" value="${esc(f.date||today())}"></div>
+    </div>
+    <div class="f2">
+      <div class="field"><label>Nominal Fee (Rp)</label><input id="m-feamount" type="number" min="0" step="50000" value="${f.amount||''}" placeholder="belum diisi"></div>
+      <div class="field"><label>Status Pembayaran</label>
+        <select id="m-festatus">
+          <option value="unpaid" ${f.status==='unpaid'?'selected':''}>Unpaid</option>
+          <option value="paid" ${f.status==='paid'?'selected':''}>Paid</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions"><button class="btn" data-savefeeedit="${f.id}">Simpan</button></div>
+    <p class="byline">Diajukan oleh ${esc(owner.name)}. Hanya Finance & Management yang bisa melihat dan mengubah nominal.</p>
+  `);
+  bindModal();
+}
+
+function vBukti(){
+  /* yang belum ada buktinya ditaruh di atas supaya jadi to-do yang jelas */
+  const fees=[...S.fees].sort((a,b)=>{
+    const ap=a.proof?1:0, bp=b.proof?1:0;
+    if(ap!==bp) return ap-bp;
+    return String(b.date||'').localeCompare(String(a.date||''));
+  });
+  const ada=fees.filter(f=>f.proof).length;
+  const paidTanpaBukti=fees.filter(f=>f.status==='paid' && !f.proof).length;
+
+  return topline('Bukti Transfer','Lampirkan screenshot transferan untuk tiap fee yang sudah dibayar. Berkasnya disimpan privat — hanya Finance & Management yang bisa membukanya.') + `
+  <div class="grid g3" style="margin-bottom:16px">
+    <div class="card accent-top" style="--ac:var(--green)"><div class="eyebrow">Sudah Ada Bukti</div><div class="stat-num" style="color:var(--green)">${ada}</div><div class="stat-note">dari ${fees.length} pengajuan fee</div></div>
+    <div class="card accent-top" style="--ac:var(--orange)"><div class="eyebrow">Paid Tanpa Bukti</div><div class="stat-num" style="color:var(--orange)">${paidTanpaBukti}</div><div class="stat-note">sudah lunas, belum dilampirkan</div></div>
+    <div class="card accent-top" style="--ac:var(--blue)"><div class="eyebrow">Total Pengajuan</div><div class="stat-num">${fees.length}</div></div>
+  </div>
+  <div class="card">
+    <h3>Daftar Fee <span class="eyebrow">gambar atau PDF, maks 10 MB</span></h3>
+    ${fees.length? fees.map(f=>{
+      const owner=byId(f.userId);
+      return `<div class="todo-row">
+        ${avatarHtml(owner,30)}
+        <div style="min-width:0;flex:1">
+          <b style="font-size:.86rem;display:block">${esc(f.project)}</b>
+          <span style="font-size:.7rem;color:var(--muted)">${esc(owner.name)}${f.role?' · '+esc(f.role):''} · ${fmtDay(f.date)}</span>
+        </div>
+        <button class="toggle-pay" data-feeedit="${f.id}" title="Klik untuk isi nominal"><span class="mono" style="font-size:.84rem">${feeAmountText(f)}</span></button>
+        ${payPill(f.status)}
+        ${f.proof
+          ? `<button class="btn ghost" style="padding:7px 12px;font-size:.75rem" data-proof-view="${f.id}">Lihat</button><button class="btn ghost" style="padding:7px 12px;font-size:.75rem" data-proof-del="${f.id}">Hapus</button>`
+          : `<label class="btn" style="padding:7px 14px;font-size:.75rem;cursor:pointer">Lampirkan<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" data-proof-file="${f.id}" hidden></label>`}
+      </div>`;}).join('') : '<div class="empty">Belum ada pengajuan fee.</div>'}
+  </div>`;
+}
+
+async function feeUploadProof(feeId, file){
+  if(!file) return;
+  if(!feeMoney()){ showToast('Hanya Finance yang bisa melampirkan bukti transfer.'); return; }
+  const f=S.fees.find(x=>x.id===feeId); if(!f) return;
+  if(file.size > 10*1024*1024){ showToast('Ukuran berkas maksimal 10 MB.'); return; }
+  showToast('Mengunggah bukti…');
+  const ext=(file.name.split('.').pop()||'png').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,5);
+  const path='fees/'+feeId+'/'+Date.now()+'.'+ext;
+  const { error } = await sb.storage.from(BUKTI_BUCKET).upload(path, file, { contentType:file.type||'image/png' });
+  if(error){ console.error('upload bukti gagal:', error); showToast('Gagal mengunggah: '+(error.message||'coba lagi')); return; }
+  f.proof={ path, name:file.name, size:file.size, at:new Date().toISOString(), by:me.id };
+  const err=await saveState();
+  showToast(err ? 'Berkas terunggah tapi gagal disimpan ke data.' : 'Bukti transfer tersimpan.');
+  render();
+}
+
+async function feeViewProof(feeId){
+  const f=S.fees.find(x=>x.id===feeId);
+  if(!f||!f.proof) return;
+  const { data, error } = await sb.storage.from(BUKTI_BUCKET).createSignedUrl(f.proof.path, 3600);
+  if(error||!data){ console.error('signed url gagal:', error); showToast('Gagal membuka bukti transfer.'); return; }
+  const owner=byId(f.userId), uploader=byId(f.proof.by);
+  const isPdf=/\.pdf$/i.test(f.proof.path);
+  openModal(`
+    <h3><span>Bukti Transfer</span><button class="modal-x" data-close aria-label="Tutup" title="Tutup">✕</button></h3>
+    <p class="sub">${esc(f.project)} · ${esc(owner.name)} · ${feeAmountText(f)}</p>
+    ${isPdf
+      ? `<p class="hint" style="margin-top:12px"><a href="${data.signedUrl}" target="_blank" rel="noopener" style="color:var(--orange)">Buka PDF di tab baru →</a></p>`
+      : `<img src="${data.signedUrl}" alt="Bukti transfer" style="width:100%;margin-top:12px;border-radius:12px;border:1px solid var(--line)">`}
+    <p class="byline">${esc(f.proof.name||'')} · diunggah ${fmtDate(String(f.proof.at||'').slice(0,10))} oleh ${esc(uploader.name)}</p>
+    <div class="modal-actions"><button class="btn ghost" data-close>Tutup</button></div>
+  `);
+  bindModal();
+}
+
+async function feeDeleteProof(feeId, btn){
+  if(!feeMoney()) return;
+  if(!confirmBtn(btn)) return;
+  const f=S.fees.find(x=>x.id===feeId);
+  if(!f||!f.proof) return;
+  const { error } = await sb.storage.from(BUKTI_BUCKET).remove([f.proof.path]);
+  if(error) console.error('hapus berkas bukti gagal:', error);
+  delete f.proof;
+  await saveState();
+  showToast('Bukti transfer dihapus.');
+  render();
+}
+
 /* =============== OVERLAY HELPERS =============== */
 const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 let trapStack=[], trapReturn=[];
@@ -2423,11 +2521,15 @@ function openFeeModal(){
     <h3><span>Ajukan Fee In-Charge</span><button class="modal-x" data-close aria-label="Tutup" title="Tutup">✕</button></h3>
     <div class="field"><label>Nama Project</label><input id="m-fproject" placeholder="mis. Konten IG Klien X"></div>
     <div class="f2">
-      <div class="field"><label>Nominal Fee (Rp)</label><input id="m-famount" type="number" min="0" step="50000" placeholder="1500000"></div>
+      <div class="field"><label>In-Charge Sebagai</label>
+        <input id="m-frole" list="feeRoleList" placeholder="mis. Fasilitator" autocomplete="off">
+        <datalist id="feeRoleList">${FEE_ROLES.map(r=>`<option value="${r}"></option>`).join('')}</datalist>
+      </div>
       <div class="field"><label>Estimasi Tanggal Cair</label><input id="m-fdate" type="date" value="${today()}"></div>
     </div>
+    ${feeMoney()?`<div class="field"><label>Nominal Fee (Rp) — boleh dikosongkan</label><input id="m-famount" type="number" min="0" step="50000" placeholder="isi sekarang atau nanti"></div>`:''}
     <div class="modal-actions"><button class="btn" data-savefee>Ajukan → masuk to-do Finance</button></div>
-    <p class="byline">Fee tercatat atas nama ${esc(me.name)} dengan status unpaid, dan otomatis muncul di dashboard Finance.</p>
+    <p class="byline">Tercatat atas nama ${esc(me.name)} dengan status unpaid.${feeMoney()?'':' Nominalnya diisi oleh Finance.'}</p>
   `);
   bindModal();
 }
@@ -2600,10 +2702,23 @@ function bindModal(){
   });
   M.querySelectorAll('[data-savefee]').forEach(b=>b.onclick=async()=>{
     const proj=M.querySelector('#m-fproject').value.trim();
-    const amt=parseInt(M.querySelector('#m-famount').value||'0',10);
+    const role=M.querySelector('#m-frole').value.trim();
     const dt=M.querySelector('#m-fdate').value||today();
-    if(!proj||!(amt>0)){ M.querySelector('#m-fproject').focus(); showToast('Isi nama proyek dan nominal fee dulu'); return; }
-    S.fees.push({id:uid('f'), userId:me.id, project:proj, amount:amt, status:'unpaid', date:dt});
+    const amtEl=M.querySelector('#m-famount');
+    const amt=amtEl?parseInt(amtEl.value||'0',10):0;
+    if(!proj){ M.querySelector('#m-fproject').focus(); showToast('Isi nama project dulu'); return; }
+    if(!role){ M.querySelector('#m-frole').focus(); showToast('Isi kamu in-charge sebagai apa'); return; }
+    S.fees.push({id:uid('f'), userId:me.id, project:proj, role, amount:(amt>0?amt:0), status:'unpaid', date:dt});
+    await withSaving(b);
+  });
+  M.querySelectorAll('[data-savefeeedit]').forEach(b=>b.onclick=async()=>{
+    if(!feeMoney()) return;
+    const f=S.fees.find(x=>x.id===b.dataset.savefeeedit); if(!f) return;
+    f.project=M.querySelector('#m-feproject').value.trim()||f.project;
+    f.role=M.querySelector('#m-ferole').value.trim();
+    f.date=M.querySelector('#m-fedate').value||f.date;
+    f.amount=parseInt(M.querySelector('#m-feamount').value||'0',10)||0;
+    f.status=M.querySelector('#m-festatus').value==='paid'?'paid':'unpaid';
     await withSaving(b);
   });
   M.querySelectorAll('[data-saveincome]').forEach(b=>b.onclick=async()=>{
@@ -2644,10 +2759,14 @@ function bind(root){
   root.querySelectorAll('[data-surat-open]').forEach(b=>b.onclick=()=>{ suratSub=b.dataset.suratOpen; render(); });
   root.querySelectorAll('[data-surat-back]').forEach(b=>b.onclick=()=>{ suratSub='list'; render(); });
   root.querySelectorAll('[data-open-fee-form]').forEach(b=>b.onclick=openFeeModal);
+  root.querySelectorAll('[data-feeedit]').forEach(b=>b.onclick=()=>openFeeEditModal(b.dataset.feeedit));
+  root.querySelectorAll('[data-proof-file]').forEach(i=>i.onchange=()=>feeUploadProof(i.dataset.proofFile, i.files&&i.files[0]));
+  root.querySelectorAll('[data-proof-view]').forEach(b=>b.onclick=()=>feeViewProof(b.dataset.proofView));
+  root.querySelectorAll('[data-proof-del]').forEach(b=>b.onclick=()=>feeDeleteProof(b.dataset.proofDel, b));
   root.querySelectorAll('[data-open-income-form]').forEach(b=>b.onclick=openIncomeModal);
   root.querySelectorAll('.toggle-pay[data-fee]').forEach(b=>b.onclick=()=>{
     const f=S.fees.find(x=>x.id===b.dataset.fee); if(!f) return;
-    if(me.div!=='ADM'&&me.div!=='FIN'&&f.userId!==me.id) return;
+    if(!feeMoney()) return;   /* status pembayaran hanya boleh diubah Finance/Admin */
     f.status=f.status==='paid'?'unpaid':'paid';
     saveState(); render();
   });
