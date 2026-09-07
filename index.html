@@ -1213,7 +1213,7 @@ function render(){
 function logTodayCard(mb){
   const entries = S.logs.filter(l=>l.userId===me.id && l.date===today()).sort((a,b)=>a.time.localeCompare(b.time));
   return `<div class="card accent-top" style="--ac:var(--orange);${mb?'margin-bottom:16px':''}">
-    <h3>Log Hari Ini <span class="eyebrow">hanya kamu & admin yang bisa lihat</span></h3>
+    <h3>Log Hari Ini <span class="eyebrow">terlihat oleh seluruh tim</span></h3>
     <div class="log-input-row">
       <input id="logQuick" placeholder="Hari ini ngerjain apa? Tekan Enter untuk simpan…" maxlength="200">
       <button class="btn" style="padding:11px 16px;font-size:.82rem" data-addlog>Catat</button>
@@ -1672,37 +1672,34 @@ function vCal(){
 
 /* =============== LOG HARIAN =============== */
 function vLog(){
-  const isAdmin = me.div==='ADM';
-  const logs = isAdmin ? S.logs : S.logs.filter(l=>l.userId===me.id);
-  const dates = [...new Set(logs.map(l=>l.date))].sort().reverse();
+  /* Log harian terbuka untuk seluruh tim: semua orang melihat catatan semua
+     orang. Menghapus tetap terbatas - hanya catatan sendiri, atau admin. */
+  const dates = [...new Set(S.logs.map(l=>l.date))].sort().reverse();
+  const bolehHapus = l => l.userId===me.id || me.div==='ADM';
 
-  return topline('Log Harian', isAdmin
-      ? 'Rekap harian pekerjaan seluruh tim. Hanya admin dan pemilik akun masing-masing yang bisa melihat log ini.'
-      : 'Rekap harian pekerjaanmu. Hanya kamu dan admin yang bisa melihat halaman ini. Catat lewat sini atau lewat kartu Log Hari Ini di Personal Board.') + `
-  ${!isAdmin?`
+  return topline('Log Harian',
+      'Rekap harian pekerjaan seluruh tim — semua orang bisa saling melihat. Catat lewat sini atau lewat kartu Log Hari Ini di Personal Board.') + `
   <div class="card" style="margin-bottom:16px">
     <div class="log-input-row">
       <input id="logQuick" placeholder="Hari ini ngerjain apa? Tekan Enter untuk simpan…" maxlength="200">
       <button class="btn" style="padding:11px 16px;font-size:.82rem" data-addlog>Catat</button>
     </div>
-  </div>`:''}
+  </div>
   <div class="card">
     ${dates.length? dates.map(dt=>{
-      const dayLogs = logs.filter(l=>l.date===dt).sort((a,b)=>a.time.localeCompare(b.time));
+      const dayLogs = S.logs.filter(l=>l.date===dt).sort((a,b)=>a.time.localeCompare(b.time));
       const byUser = {};
       dayLogs.forEach(l=>{ (byUser[l.userId]=byUser[l.userId]||[]).push(l); });
       return `<div class="log-day">${dt===today()?'Hari Ini · ':''}${fmtFull(dt)}</div>
-        ${isAdmin
-          ? Object.entries(byUser).map(([uidk,items])=>{
-              const u=byId(uidk);
-              return `<div style="display:flex;gap:12px;align-items:flex-start;padding:8px 0">
-                ${avatarHtml(u,30)}
-                <div style="flex:1;min-width:0">
-                  <b style="font-size:.82rem">${esc(u.name)} <span style="color:${D(u.div).hue};font-size:.66rem;font-family:'IBM Plex Mono',monospace">· ${esc(divAbbr(u))}</span></b>
-                  ${items.map(l=>`<div class="log-item"><span class="time">${esc(l.time)}</span><p>${esc(l.text)}</p></div>`).join('')}
-                </div>
-              </div>`;}).join('')
-          : dayLogs.map(l=>`<div class="log-item"><span class="time">${esc(l.time)}</span><p>${esc(l.text)}</p><button class="log-del" data-dellog="${l.id}" aria-label="Hapus log">✕</button></div>`).join('')}
+        ${Object.entries(byUser).map(([uidk,items])=>{
+          const u=byId(uidk), aku = uidk===me.id;
+          return `<div style="display:flex;gap:12px;align-items:flex-start;padding:8px 0">
+            ${avatarHtml(u,30)}
+            <div style="flex:1;min-width:0">
+              <b style="font-size:.82rem">${esc(u.name)}${aku?' <span style="color:var(--faint);font-weight:500;font-size:.7rem">(kamu)</span>':''} <span style="color:${D(u.div).hue};font-size:.66rem;font-family:'IBM Plex Mono',monospace">· ${esc(divAbbr(u))}</span></b>
+              ${items.map(l=>`<div class="log-item"><span class="time">${esc(l.time)}</span><p>${esc(l.text)}</p>${bolehHapus(l)?`<button class="log-del" data-dellog="${l.id}" aria-label="Hapus log">✕</button>`:''}</div>`).join('')}
+            </div>
+          </div>`;}).join('')}
       `;}).join('') : `<div class="empty">Belum ada log tercatat.</div>`}
   </div>`;
 }
